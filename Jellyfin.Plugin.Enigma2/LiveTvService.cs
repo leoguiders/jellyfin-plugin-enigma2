@@ -9,6 +9,8 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Xml;
+using J2N;
+using Jellyfin.Plugin.Enigma2.Helpers;
 using MediaBrowser.Common.Extensions;
 using MediaBrowser.Common.Net;
 using MediaBrowser.Controller.Drawing;
@@ -17,7 +19,6 @@ using MediaBrowser.Model.Dto;
 using MediaBrowser.Model.Entities;
 using MediaBrowser.Model.LiveTv;
 using MediaBrowser.Model.MediaInfo;
-using Jellyfin.Plugin.Enigma2.Helpers;
 using Microsoft.Extensions.Logging;
 
 namespace Jellyfin.Plugin.Enigma2
@@ -686,12 +687,7 @@ namespace Jellyfin.Plugin.Enigma2
                             recordingInfo.StartDate = sdate.ToUniversalTime();
 
                             //length in format mm:ss
-                            var words = e2length.Split(':');
-                            var mins = long.Parse(words[0]);
-                            var seconds = long.Parse(words[1]);
-                            var edated = long.Parse(e2time) + (mins * 60) + (seconds);
-                            var edate = ApiHelper.DateTimeFromUnixTimestampSeconds(edated);
-                            recordingInfo.EndDate = edate.ToUniversalTime();
+                            recordingInfo.EndDate = ParseLengthField(sdated, e2length);
 
                             //recordingInfo.EpisodeTitle = e2title;
                             recordingInfo.EpisodeTitle = null;
@@ -1703,6 +1699,23 @@ namespace Jellyfin.Plugin.Enigma2
             throw new NotImplementedException();
         }
 
+        private static DateTime ParseLengthField(long startTime, string e2length)
+        {
+            if (string.IsNullOrWhiteSpace(e2length))
+                return DateTime.MinValue;
+
+            var words = e2length.Split(':');
+            if (words.Length != 2)
+                return DateTime.MinValue;
+
+            long mins = 0;
+            _ = long.TryParse(words[0], out mins);
+            long seconds = 0;
+            _ = long.TryParse(words[1], out seconds);
+            var edated = startTime + (mins * 60) + seconds;
+            var edate = ApiHelper.DateTimeFromUnixTimestampSeconds(edated);
+            return edate.ToUniversalTime();
+        }
     }
 
 }
