@@ -29,7 +29,7 @@ namespace Jellyfin.Plugin.Enigma2
 
         public string Name => "Enigma2 Recordings";
 
-        public string[] Attributes => new[] { "Recordings" };
+        public string[] Attributes => ["Recordings"];
 
         public string Description => "Enigma2 Recordings";
 
@@ -63,17 +63,17 @@ namespace Jellyfin.Plugin.Enigma2
         {
             return new InternalChannelFeatures
             {
-                ContentTypes = new List<ChannelMediaContentType>
-                 {
+                ContentTypes =
+                 [
                     ChannelMediaContentType.Movie,
                     ChannelMediaContentType.Episode,
                     ChannelMediaContentType.Clip
-                 },
-                MediaTypes = new List<ChannelMediaType>
-                  {
+                 ],
+                MediaTypes =
+                  [
                        ChannelMediaType.Audio,
                        ChannelMediaType.Video
-                  },
+                  ],
                 SupportsContentDownloading = true
             };
         }
@@ -98,10 +98,10 @@ namespace Jellyfin.Plugin.Enigma2
 
         public IEnumerable<ImageType> GetSupportedChannelImages()
         {
-            return new List<ImageType>
-            {
+            return
+            [
                  ImageType.Primary
-            };
+            ];
         }
 
         public bool IsEnabledFor(string userId)
@@ -171,7 +171,7 @@ namespace Jellyfin.Plugin.Enigma2
 
             var result = new ChannelItemResult()
             {
-                Items = new List<ChannelItemInfo>()
+                Items = []
             };
 
             return Task.FromResult(result);
@@ -205,15 +205,15 @@ namespace Jellyfin.Plugin.Enigma2
                 Id = item.Id,
                 //IndexNumber = item.IndexNumber,
                 MediaType = item.ChannelType == ChannelType.TV ? ChannelMediaType.Video : ChannelMediaType.Audio,
-                MediaSources = new List<MediaSourceInfo>
-                {
+                MediaSources =
+                [
                     new MediaSourceInfo
                     {
                         Path = path,
                         Protocol = path.StartsWith("http", StringComparison.OrdinalIgnoreCase) ? MediaProtocol.Http : MediaProtocol.File,
                         Id = item.Id
                     }
-                },
+                ],
                 //ParentIndexNumber = item.ParentIndexNumber,
                 PremiereDate = item.OriginalAirDate,
                 //ProductionYear = item.ProductionYear,
@@ -517,7 +517,7 @@ namespace Jellyfin.Plugin.Enigma2
 
         public MyRecordingInfo()
         {
-            Genres = new List<string>();
+            Genres = [];
         }
     }
 

@@ -31,12 +31,12 @@ namespace Jellyfin.Plugin.Enigma2
         private readonly ILogger<LiveTvService> _logger;
         private int _liveStreams;
 
-        private string tvBouquetSRef;
-        private List<ChannelInfo> tvChannelInfos = new List<ChannelInfo>();
+        private string _tvBouquetSRef;
+        private List<ChannelInfo> _tvChannelInfos = [];
 
         public DateTime LastRecordingChange = DateTime.MinValue;
 
-        private IHttpClientFactory _httpClientFactory;
+        private readonly IHttpClientFactory _httpClientFactory;
 
         public static LiveTvService Instance { get; private set; }
 
@@ -58,18 +58,17 @@ namespace Jellyfin.Plugin.Enigma2
             _logger.LogInformation("[Enigma2] Start EnsureConnectionAsync");
 
             var config = Plugin.Instance.Configuration;
-
             // log settings
-            _logger.LogInformation(string.Format("[Enigma2] EnsureConnectionAsync HostName: {0}", config.HostName));
-            _logger.LogInformation(string.Format("[Enigma2] EnsureConnectionAsync StreamingPort: {0}", config.StreamingPort));
-            _logger.LogInformation(string.Format("[Enigma2] EnsureConnectionAsync WebInterfacePort: {0}", config.WebInterfacePort));
+            _logger.LogInformation("[Enigma2] EnsureConnectionAsync HostName: {Hostname}", config.HostName);
+            _logger.LogInformation("[Enigma2] EnsureConnectionAsync StreamingPort: {StreamingPort}", config.StreamingPort);
+            _logger.LogInformation("[Enigma2] EnsureConnectionAsync WebInterfacePort: {WebInterfacePort}", config.WebInterfacePort);
             if (string.IsNullOrEmpty(config.WebInterfaceUsername))
             {
                 _logger.LogInformation("[Enigma2] EnsureConnectionAsync WebInterfaceUsername: ");
             }
             else
             {
-                _logger.LogInformation(string.Format("[Enigma2] EnsureConnectionAsync WebInterfaceUsername: {0}", "********"));
+                _logger.LogInformation("[Enigma2] EnsureConnectionAsync WebInterfaceUsername: ********");
             }
 
             if (string.IsNullOrEmpty(config.WebInterfacePassword))
@@ -78,19 +77,19 @@ namespace Jellyfin.Plugin.Enigma2
             }
             else
             {
-                _logger.LogInformation(string.Format("[Enigma2] EnsureConnectionAsync WebInterfaceUsername: {0}", "********"));
+                _logger.LogInformation("[Enigma2] EnsureConnectionAsync WebInterfaceUsername: ********");
             }
 
-            _logger.LogInformation(string.Format("[Enigma2] EnsureConnectionAsync UseLoginForStreams: {0}", config.UseLoginForStreams));
-            _logger.LogInformation(string.Format("[Enigma2] EnsureConnectionAsync UseSecureHTTPS: {0}", config.UseSecureHTTPS));
-            _logger.LogInformation(string.Format("[Enigma2] EnsureConnectionAsync UseSecureHTTPSForStreams: {0}", config.UseSecureHTTPSForStreams));
-            _logger.LogInformation(string.Format("[Enigma2] EnsureConnectionAsync OnlyOneBouquet: {0}", config.OnlyOneBouquet));
-            _logger.LogInformation(string.Format("[Enigma2] EnsureConnectionAsync TVBouquet: {0}", config.TVBouquet));
-            _logger.LogInformation(string.Format("[Enigma2] EnsureConnectionAsync ZapToChannel: {0}", config.ZapToChannel));
-            _logger.LogInformation(string.Format("[Enigma2] EnsureConnectionAsync FetchPiconsFromWebInterface: {0}", config.FetchPiconsFromWebInterface));
-            _logger.LogInformation(string.Format("[Enigma2] EnsureConnectionAsync PiconsPath: {0}", config.PiconsPath));
-            _logger.LogInformation(string.Format("[Enigma2] EnsureConnectionAsync RecordingPath: {0}", config.RecordingPath));
-            _logger.LogInformation(string.Format("[Enigma2] EnsureConnectionAsync EnableDebugLogging: {0}", config.EnableDebugLogging));
+            _logger.LogInformation("[Enigma2] EnsureConnectionAsync UseLoginForStreams: {UseLoginForStreams}", config.UseLoginForStreams);
+            _logger.LogInformation("[Enigma2] EnsureConnectionAsync UseSecureHTTPS: {UseSecureHTTPS}", config.UseSecureHTTPS);
+            _logger.LogInformation("[Enigma2] EnsureConnectionAsync UseSecureHTTPSForStreams: {UseSecureHTTPSForStreams}", config.UseSecureHTTPSForStreams);
+            _logger.LogInformation("[Enigma2] EnsureConnectionAsync OnlyOneBouquet: {OnlyOneBouquet}", config.OnlyOneBouquet);
+            _logger.LogInformation("[Enigma2] EnsureConnectionAsync TVBouquet: {TVBouquet}", config.TVBouquet);
+            _logger.LogInformation("[Enigma2] EnsureConnectionAsync ZapToChannel: {ZapToChannel}", config.ZapToChannel);
+            _logger.LogInformation("[Enigma2] EnsureConnectionAsync FetchPiconsFromWebInterface: {FetchPiconsFromWebInterface}", config.FetchPiconsFromWebInterface);
+            _logger.LogInformation("[Enigma2] EnsureConnectionAsync PiconsPath: {PiconsPath}", config.PiconsPath);
+            _logger.LogInformation("[Enigma2] EnsureConnectionAsync RecordingPath: {RecordingPath}", config.RecordingPath);
+            _logger.LogInformation("[Enigma2] EnsureConnectionAsync EnableDebugLogging: {EnableDebugLogging}", config.EnableDebugLogging);
 
             // validate settings
             if (string.IsNullOrEmpty(config.HostName))
@@ -140,13 +139,13 @@ namespace Jellyfin.Plugin.Enigma2
             if (config.OnlyOneBouquet)
             {
                 // connect to Enigma2 box to test connectivity and at same time get sRef for TV Bouquet.
-                tvBouquetSRef = await InitiateSession(cancellationToken, config.TVBouquet).ConfigureAwait(false);
+                _tvBouquetSRef = await InitiateSession(config.TVBouquet, cancellationToken).ConfigureAwait(false);
             }
             else
             {
                 // connect to Enigma2 box to test connectivity.
-                var resultNotRequired = await InitiateSession(cancellationToken, null).ConfigureAwait(false);
-                tvBouquetSRef = null;
+                _ = await InitiateSession(null, cancellationToken).ConfigureAwait(false);
+                _tvBouquetSRef = null;
             }
         }
 
@@ -174,10 +173,10 @@ namespace Jellyfin.Plugin.Enigma2
         /// <summary>
         /// Checks connection to Enigma2 and retrieves service reference for channel if only one bouquet.
         /// </summary>
-        /// <param name="cancellationToken">The cancellation token.</param>
         /// <param name="tvBouquet">The TV Bouquet.</param>
+        /// <param name="cancellationToken">The cancellation token.</param>
         /// <returns>Task{String>}.</returns>
-        public async Task<string> InitiateSession(CancellationToken cancellationToken, string tvBouquet)
+        public async Task<string> InitiateSession(string tvBouquet, CancellationToken cancellationToken)
         {
             _logger.LogInformation("[Enigma2] Start InitiateSession, validates connection and returns Bouquet reference if required");
             //await EnsureConnectionAsync(cancellationToken).ConfigureAwait(false);
@@ -193,66 +192,61 @@ namespace Jellyfin.Plugin.Enigma2
             var url = string.Format("{0}/web/getservices", baseUrl);
             UtilsHelper.DebugInformation(_logger, string.Format("[Enigma2] InitiateSession url: {0}", url));
 
-            using (var stream = await GetHttpClient().GetStreamAsync(url, cancellationToken).ConfigureAwait(false))
+            using var stream = await GetHttpClient().GetStreamAsync(url, cancellationToken).ConfigureAwait(false);
+            using var reader = new StreamReader(stream);
+            var xmlResponse = reader.ReadToEnd();
+            UtilsHelper.DebugInformation(_logger, string.Format("[Enigma2] InitiateSession response: {0}", xmlResponse));
+
+            try
             {
-                using (var reader = new StreamReader(stream))
+                var xml = new XmlDocument();
+                xml.LoadXml(xmlResponse);
+
+                string tvBouquetReference = null;
+
+                var e2services = xml.GetElementsByTagName("e2service");
+
+                // If TV Bouquet passed find associated service reference
+                if (!string.IsNullOrEmpty(tvBouquet))
                 {
-                    var xmlResponse = reader.ReadToEnd();
-                    UtilsHelper.DebugInformation(_logger, string.Format("[Enigma2] InitiateSession response: {0}", xmlResponse));
-
-                    try
+                    foreach (XmlNode xmlNode in e2services)
                     {
-                        var xml = new XmlDocument();
-                        xml.LoadXml(xmlResponse);
+                        var channelInfo = new ChannelInfo();
 
-                        string tvBouquetReference = null;
+                        var e2servicereference = "?";
+                        var e2servicename = "?";
 
-                        var e2services = xml.GetElementsByTagName("e2service");
-
-                        // If TV Bouquet passed find associated service reference
-                        if (!string.IsNullOrEmpty(tvBouquet))
+                        foreach (XmlNode node in xmlNode.ChildNodes)
                         {
-                            foreach (XmlNode xmlNode in e2services)
+                            if (node.Name == "e2servicereference")
                             {
-                                var channelInfo = new ChannelInfo();
-
-                                var e2servicereference = "?";
-                                var e2servicename = "?";
-
-                                foreach (XmlNode node in xmlNode.ChildNodes)
-                                {
-                                    if (node.Name == "e2servicereference")
-                                    {
-                                        e2servicereference = node.InnerText;
-                                    }
-                                    else if (node.Name == "e2servicename")
-                                    {
-                                        e2servicename = node.InnerText;
-                                    }
-                                }
-                                if (tvBouquet == e2servicename)
-                                {
-                                    tvBouquetReference = e2servicereference;
-                                    return tvBouquetReference;
-                                }
+                                e2servicereference = node.InnerText;
                             }
-                            // make sure we have found the TV Bouquet
-                            if (!string.IsNullOrEmpty(tvBouquet))
+                            else if (node.Name == "e2servicename")
                             {
-                                _logger.LogError("[Enigma2] Failed to find TV Bouquet specified in Enigma2 configuration.");
-                                throw new ApplicationException("Failed to find TV Bouquet specified in Enigma2 configuration.");
+                                e2servicename = node.InnerText;
                             }
                         }
-                        return tvBouquetReference;
+                        if (tvBouquet == e2servicename)
+                        {
+                            tvBouquetReference = e2servicereference;
+                            return tvBouquetReference;
+                        }
                     }
-                    catch (Exception e)
+                    // make sure we have found the TV Bouquet
+                    if (!string.IsNullOrEmpty(tvBouquet))
                     {
-                        _logger.LogError("[Enigma2] Failed to parse services information.");
-                        _logger.LogError(string.Format("[Enigma2] InitiateSession error: {0}", e.Message));
-                        throw new ApplicationException("Failed to connect to Enigma2.");
+                        _logger.LogError("[Enigma2] Failed to find TV Bouquet specified in Enigma2 configuration.");
+                        throw new ApplicationException("Failed to find TV Bouquet specified in Enigma2 configuration.");
                     }
-
                 }
+                return tvBouquetReference;
+            }
+            catch (Exception e)
+            {
+                _logger.LogError("[Enigma2] Failed to parse services information.");
+                _logger.LogError("[Enigma2] InitiateSession error: {Message}", e.Message);
+                throw new ApplicationException("Failed to connect to Enigma2.");
             }
         }
 
@@ -278,13 +272,13 @@ namespace Jellyfin.Plugin.Enigma2
             var baseUrlPicon = protocol + "://" + Plugin.Instance.Configuration.HostName + ":" + Plugin.Instance.Configuration.WebInterfacePort;
 
             string url;
-            if (string.IsNullOrEmpty(tvBouquetSRef))
+            if (string.IsNullOrEmpty(_tvBouquetSRef))
             {
                 url = string.Format("{0}/web/getservices", baseUrl);
             }
             else
             {
-                url = string.Format("{0}/web/getservices?sRef={1}", baseUrl, tvBouquetSRef);
+                url = string.Format("{0}/web/getservices?sRef={1}", baseUrl, _tvBouquetSRef);
             }
 
             UtilsHelper.DebugInformation(_logger, string.Format("[Enigma2] GetChannelsAsync url: {0}", url));
@@ -294,136 +288,132 @@ namespace Jellyfin.Plugin.Enigma2
                 baseUrlPicon = protocol + "://" + Plugin.Instance.Configuration.WebInterfaceUsername + ":" + Plugin.Instance.Configuration.WebInterfacePassword + "@" + Plugin.Instance.Configuration.HostName + ":" + Plugin.Instance.Configuration.WebInterfacePort;
             }
 
-            using (var stream = await GetHttpClient().GetStreamAsync(url, cancellationToken).ConfigureAwait(false))
+            using var stream = await GetHttpClient().GetStreamAsync(url, cancellationToken).ConfigureAwait(false);
+            using var reader = new StreamReader(stream);
+
+            var xmlResponse = reader.ReadToEnd();
+            UtilsHelper.DebugInformation(_logger, string.Format("[Enigma2] GetChannelsAsync response: {0}", xmlResponse));
+
+            try
             {
-                using (var reader = new StreamReader(stream))
+                var xml = new XmlDocument();
+                xml.LoadXml(xmlResponse);
+
+                var channelInfos = new List<ChannelInfo>();
+
+                if (string.IsNullOrEmpty(_tvBouquetSRef))
                 {
+                    // Load channels from all TV Bouquets
+                    _logger.LogInformation("[Enigma2] GetChannelsAsync for all TV Bouquets");
 
-                    var xmlResponse = reader.ReadToEnd();
-                    UtilsHelper.DebugInformation(_logger, string.Format("[Enigma2] GetChannelsAsync response: {0}", xmlResponse));
-
-                    try
+                    var e2services = xml.GetElementsByTagName("e2service");
+                    foreach (XmlNode xmlNode in e2services)
                     {
-                        var xml = new XmlDocument();
-                        xml.LoadXml(xmlResponse);
+                        var channelInfo = new ChannelInfo();
+                        var e2servicereference = "?";
+                        var e2servicename = "?";
 
-                        var channelInfos = new List<ChannelInfo>();
-
-                        if (string.IsNullOrEmpty(tvBouquetSRef))
+                        foreach (XmlNode node in xmlNode.ChildNodes)
                         {
-                            // Load channels from all TV Bouquets
-                            _logger.LogInformation("[Enigma2] GetChannelsAsync for all TV Bouquets");
-
-                            var e2services = xml.GetElementsByTagName("e2service");
-                            foreach (XmlNode xmlNode in e2services)
+                            if (node.Name == "e2servicereference")
                             {
-                                var channelInfo = new ChannelInfo();
-                                var e2servicereference = "?";
-                                var e2servicename = "?";
+                                e2servicereference = node.InnerText;
+                            }
+                            else if (node.Name == "e2servicename")
+                            {
+                                e2servicename = node.InnerText;
+                            }
+                        }
 
-                                foreach (XmlNode node in xmlNode.ChildNodes)
-                                {
-                                    if (node.Name == "e2servicereference")
-                                    {
-                                        e2servicereference = node.InnerText;
-                                    }
-                                    else if (node.Name == "e2servicename")
-                                    {
-                                        e2servicename = node.InnerText;
-                                    }
-                                }
+                        // get all channels for TV Bouquet
+                        var channelInfosForBouquet = await GetChannelsForTVBouquetAsync(e2servicereference, cancellationToken).ConfigureAwait(false);
 
-                                // get all channels for TV Bouquet
-                                var channelInfosForBouquet = await GetChannelsForTVBouquetAsync(cancellationToken, e2servicereference).ConfigureAwait(false);
+                        // store all channels for TV Bouquet
+                        channelInfos.AddRange(channelInfosForBouquet);
+                    }
 
-                                // store all channels for TV Bouquet
-                                channelInfos.AddRange(channelInfosForBouquet);
+                    return channelInfos;
+                }
+                else
+                {
+                    // Load channels for specified TV Bouquet only
+                    var count = 1;
+
+                    var e2services = xml.GetElementsByTagName("e2service");
+                    foreach (XmlNode xmlNode in e2services)
+                    {
+                        var channelInfo = new ChannelInfo();
+
+                        var e2servicereference = "?";
+                        var e2servicename = "?";
+
+                        foreach (XmlNode node in xmlNode.ChildNodes)
+                        {
+                            if (node.Name == "e2servicereference")
+                            {
+                                e2servicereference = node.InnerText;
+                            }
+                            else if (node.Name == "e2servicename")
+                            {
+                                e2servicename = node.InnerText;
+                            }
+                        }
+
+                        // Check whether the current element is not just a label
+                        if (!e2servicereference.StartsWith("1:64:"))
+                        {
+                            //check for radio channel
+                            if (e2servicereference.Contains("RADIO", StringComparison.CurrentCultureIgnoreCase))
+                            {
+                                channelInfo.ChannelType = ChannelType.Radio;
+                            }
+                            else
+                            {
+                                channelInfo.ChannelType = ChannelType.TV;
                             }
 
-                            return channelInfos;
+                            channelInfo.HasImage = true;
+                            channelInfo.Id = e2servicereference;
+
+                            // image name is name is e2servicereference with last char removed, then replace all : with _, then add .png
+                            var imageName = e2servicereference.Remove(e2servicereference.Length - 1);
+                            imageName = imageName.Replace(":", "_");
+                            imageName += ".png";
+                            //var imageUrl = string.Format("{0}/picon/{1}", baseUrl, imageName);
+                            var imageUrl = string.Format("{0}/picon/{1}", baseUrlPicon, imageName);
+
+                            if (Plugin.Instance.Configuration.FetchPiconsFromWebInterface)
+                            {
+                                channelInfo.ImagePath = null;
+                                //channelInfo.ImageUrl = WebUtility.UrlEncode(imageUrl);
+                                channelInfo.ImageUrl = imageUrl;
+                            }
+                            else
+                            {
+                                channelInfo.ImagePath = Plugin.Instance.Configuration.PiconsPath + imageName;
+                                channelInfo.ImageUrl = null;
+                            }
+
+                            channelInfo.Name = e2servicename;
+                            channelInfo.Number = count.ToString();
+
+                            channelInfos.Add(channelInfo);
+                            count++;
                         }
                         else
                         {
-                            // Load channels for specified TV Bouquet only
-                            var count = 1;
-
-                            var e2services = xml.GetElementsByTagName("e2service");
-                            foreach (XmlNode xmlNode in e2services)
-                            {
-                                var channelInfo = new ChannelInfo();
-
-                                var e2servicereference = "?";
-                                var e2servicename = "?";
-
-                                foreach (XmlNode node in xmlNode.ChildNodes)
-                                {
-                                    if (node.Name == "e2servicereference")
-                                    {
-                                        e2servicereference = node.InnerText;
-                                    }
-                                    else if (node.Name == "e2servicename")
-                                    {
-                                        e2servicename = node.InnerText;
-                                    }
-                                }
-
-                                // Check whether the current element is not just a label
-                                if (!e2servicereference.StartsWith("1:64:"))
-                                {
-                                    //check for radio channel
-                                    if (e2servicereference.ToUpper().Contains("RADIO"))
-                                    {
-                                        channelInfo.ChannelType = ChannelType.Radio;
-                                    }
-                                    else
-                                    {
-                                        channelInfo.ChannelType = ChannelType.TV;
-                                    }
-
-                                    channelInfo.HasImage = true;
-                                    channelInfo.Id = e2servicereference;
-
-                                    // image name is name is e2servicereference with last char removed, then replace all : with _, then add .png
-                                    var imageName = e2servicereference.Remove(e2servicereference.Length - 1);
-                                    imageName = imageName.Replace(":", "_");
-                                    imageName = imageName + ".png";
-                                    //var imageUrl = string.Format("{0}/picon/{1}", baseUrl, imageName);
-                                    var imageUrl = string.Format("{0}/picon/{1}", baseUrlPicon, imageName);
-
-                                    if (Plugin.Instance.Configuration.FetchPiconsFromWebInterface)
-                                    {
-                                        channelInfo.ImagePath = null;
-                                        //channelInfo.ImageUrl = WebUtility.UrlEncode(imageUrl);
-                                        channelInfo.ImageUrl = imageUrl;
-                                    }
-                                    else
-                                    {
-                                        channelInfo.ImagePath = Plugin.Instance.Configuration.PiconsPath + imageName;
-                                        channelInfo.ImageUrl = null;
-                                    }
-
-                                    channelInfo.Name = e2servicename;
-                                    channelInfo.Number = count.ToString();
-
-                                    channelInfos.Add(channelInfo);
-                                    count = count + 1;
-                                }
-                                else
-                                {
-                                    _logger.LogInformation("[Enigma2] ignoring channel label " + e2servicereference);
-                                }
-                            }
+                            _logger.LogInformation("[Enigma2] ignoring channel label {e2servicereference}", e2servicereference);
                         }
-                        tvChannelInfos = channelInfos;
-                        return channelInfos;
-                    }
-                    catch (Exception e)
-                    {
-                        _logger.LogError("[Enigma2] Failed to parse channel information.");
-                        _logger.LogError(string.Format("[Enigma2] GetChannelsAsync error: {0}", e.Message));
-                        throw new ApplicationException("Failed to parse channel information.");
                     }
                 }
+                _tvChannelInfos = channelInfos;
+                return channelInfos;
+            }
+            catch (Exception e)
+            {
+                _logger.LogError("[Enigma2] Failed to parse channel information.");
+                _logger.LogError("[Enigma2] GetChannelsAsync error: {Message}", e.Message);
+                throw new ApplicationException("Failed to parse channel information.");
             }
         }
 
@@ -431,12 +421,12 @@ namespace Jellyfin.Plugin.Enigma2
         /// <summary>
         /// Gets the channels async.
         /// </summary>
-        /// <param name="cancellationToken">The cancellation token.</param>
         /// <param name="sRef">Service reference</param>
+        /// <param name="cancellationToken">The cancellation token.</param>
         /// <returns>Task{List<ChannelInfo>}.</returns>
-        public async Task<List<ChannelInfo>> GetChannelsForTVBouquetAsync(CancellationToken cancellationToken, string sRef)
+        public async Task<List<ChannelInfo>> GetChannelsForTVBouquetAsync(string sRef, CancellationToken cancellationToken)
         {
-            _logger.LogInformation("[Enigma2] Start GetChannelsForTVBouquetAsync, retrieve all channels for TV Bouquet " + sRef);
+            _logger.LogInformation("[Enigma2] Start GetChannelsForTVBouquetAsync, retrieve all channels for TV Bouquet {sRef}", sRef);
             await EnsureConnectionAsync(cancellationToken).ConfigureAwait(false);
 
             var protocol = "http";
@@ -458,99 +448,95 @@ namespace Jellyfin.Plugin.Enigma2
                 baseUrlPicon = protocol + "://" + Plugin.Instance.Configuration.WebInterfaceUsername + ":" + Plugin.Instance.Configuration.WebInterfacePassword + "@" + Plugin.Instance.Configuration.HostName + ":" + Plugin.Instance.Configuration.WebInterfacePort;
             }
 
-            using (var stream = await GetHttpClient().GetStreamAsync(url, cancellationToken).ConfigureAwait(false))
+            using var stream = await GetHttpClient().GetStreamAsync(url, cancellationToken).ConfigureAwait(false);
+            using var reader = new StreamReader(stream);
+            var xmlResponse = reader.ReadToEnd();
+            UtilsHelper.DebugInformation(_logger, string.Format("[Enigma2] GetChannelsForTVBouquetAsync response: {0}", xmlResponse));
+
+            try
             {
-                using (var reader = new StreamReader(stream))
+                var xml = new XmlDocument();
+                xml.LoadXml(xmlResponse);
+
+                var channelInfos = new List<ChannelInfo>();
+
+                // Load channels for specified TV Bouquet only
+
+                var count = 1;
+
+                var e2services = xml.GetElementsByTagName("e2service");
+                foreach (XmlNode xmlNode in e2services)
                 {
-                    var xmlResponse = reader.ReadToEnd();
-                    UtilsHelper.DebugInformation(_logger, string.Format("[Enigma2] GetChannelsForTVBouquetAsync response: {0}", xmlResponse));
+                    var channelInfo = new ChannelInfo();
 
-                    try
+                    var e2servicereference = "?";
+                    var e2servicename = "?";
+
+                    foreach (XmlNode node in xmlNode.ChildNodes)
                     {
-                        var xml = new XmlDocument();
-                        xml.LoadXml(xmlResponse);
-
-                        var channelInfos = new List<ChannelInfo>();
-
-                        // Load channels for specified TV Bouquet only
-
-                        var count = 1;
-
-                        var e2services = xml.GetElementsByTagName("e2service");
-                        foreach (XmlNode xmlNode in e2services)
+                        if (node.Name == "e2servicereference")
                         {
-                            var channelInfo = new ChannelInfo();
-
-                            var e2servicereference = "?";
-                            var e2servicename = "?";
-
-                            foreach (XmlNode node in xmlNode.ChildNodes)
-                            {
-                                if (node.Name == "e2servicereference")
-                                {
-                                    e2servicereference = node.InnerText;
-                                }
-                                else if (node.Name == "e2servicename")
-                                {
-                                    e2servicename = node.InnerText;
-                                }
-                            }
-
-                            // Check whether the current element is not just a label
-                            if (!e2servicereference.StartsWith("1:64:"))
-                            {
-                                //check for radio channel
-                                if (e2servicereference.Contains("radio"))
-                                {
-                                    channelInfo.ChannelType = ChannelType.Radio;
-                                }
-                                else
-                                {
-                                    channelInfo.ChannelType = ChannelType.TV;
-                                }
-
-                                channelInfo.HasImage = true;
-                                channelInfo.Id = e2servicereference;
-
-                                // image name is name is e2servicereference with last char removed, then replace all : with _, then add .png
-                                var imageName = e2servicereference.Remove(e2servicereference.Length - 1);
-                                imageName = imageName.Replace(":", "_");
-                                imageName = imageName + ".png";
-                                //var imageUrl = string.Format("{0}/picon/{1}", baseUrl, imageName);
-                                var imageUrl = string.Format("{0}/picon/{1}", baseUrlPicon, imageName);
-
-                                if (Plugin.Instance.Configuration.FetchPiconsFromWebInterface)
-                                {
-                                    channelInfo.ImagePath = null;
-                                    //channelInfo.ImageUrl = WebUtility.UrlEncode(imageUrl);
-                                    channelInfo.ImageUrl = imageUrl;
-                                }
-                                else
-                                {
-                                    channelInfo.ImagePath = Plugin.Instance.Configuration.PiconsPath + imageName;
-                                    channelInfo.ImageUrl = null;
-                                }
-
-                                channelInfo.Name = e2servicename;
-                                channelInfo.Number = count.ToString();
-
-                                channelInfos.Add(channelInfo);
-                                count++;
-                            }
-                            else
-                            {
-                                UtilsHelper.DebugInformation(_logger, string.Format("[Enigma2] ignoring channel {0}", e2servicereference));
-                            }
+                            e2servicereference = node.InnerText;
                         }
-                        return channelInfos;
+                        else if (node.Name == "e2servicename")
+                        {
+                            e2servicename = node.InnerText;
+                        }
                     }
-                    catch (Exception e)
+
+                    // Check whether the current element is not just a label
+                    if (!e2servicereference.StartsWith("1:64:"))
                     {
-                        _logger.LogError("[Enigma2] Failed to parse channel information.");
-                        _logger.LogError(string.Format("[Enigma2] GetChannelsForTVBouquetAsync error: {0}", e.Message));
-                        throw new ApplicationException("Failed to parse channel information.");
+                        //check for radio channel
+                        if (e2servicereference.Contains("radio"))
+                        {
+                            channelInfo.ChannelType = ChannelType.Radio;
+                        }
+                        else
+                        {
+                            channelInfo.ChannelType = ChannelType.TV;
+                        }
+
+                        channelInfo.HasImage = true;
+                        channelInfo.Id = e2servicereference;
+
+                        // image name is name is e2servicereference with last char removed, then replace all : with _, then add .png
+                        var imageName = e2servicereference.Remove(e2servicereference.Length - 1);
+                        imageName = imageName.Replace(":", "_");
+                        imageName += ".png";
+                        //var imageUrl = string.Format("{0}/picon/{1}", baseUrl, imageName);
+                        var imageUrl = string.Format("{0}/picon/{1}", baseUrlPicon, imageName);
+
+                        if (Plugin.Instance.Configuration.FetchPiconsFromWebInterface)
+                        {
+                            channelInfo.ImagePath = null;
+                            //channelInfo.ImageUrl = WebUtility.UrlEncode(imageUrl);
+                            channelInfo.ImageUrl = imageUrl;
+                        }
+                        else
+                        {
+                            channelInfo.ImagePath = Plugin.Instance.Configuration.PiconsPath + imageName;
+                            channelInfo.ImageUrl = null;
+                        }
+
+                        channelInfo.Name = e2servicename;
+                        channelInfo.Number = count.ToString();
+
+                        channelInfos.Add(channelInfo);
+                        count++;
+                    }
+                    else
+                    {
+                        UtilsHelper.DebugInformation(_logger, string.Format("[Enigma2] ignoring channel {0}", e2servicereference));
                     }
                 }
+                return channelInfos;
+            }
+            catch (Exception e)
+            {
+                _logger.LogError("[Enigma2] Failed to parse channel information.");
+                _logger.LogError("[Enigma2] GetChannelsForTVBouquetAsync error: {Message}", e.Message);
+                throw new ApplicationException("Failed to parse channel information.");
             }
         }
 
@@ -562,8 +548,8 @@ namespace Jellyfin.Plugin.Enigma2
         /// <returns>Task{IEnumerable{MyRecordingInfo}}</returns>
         public async Task<IEnumerable<MyRecordingInfo>> GetRecordingsAsync(CancellationToken cancellationToken)
         {
-            await Task.Delay(0); //to avoid await warnings
-            return new List<MyRecordingInfo>();
+            await Task.Delay(0, cancellationToken); //to avoid await warnings
+            return [];
         }
 
         public async Task<IEnumerable<MyRecordingInfo>> GetAllRecordingsAsync(CancellationToken cancellationToken)
@@ -582,155 +568,151 @@ namespace Jellyfin.Plugin.Enigma2
             var url = string.Format("{0}/web/movielist", baseUrl);
             UtilsHelper.DebugInformation(_logger, string.Format("[Enigma2] GetRecordingsAsync url: {0}", url));
 
-            using (var stream = await GetHttpClient().GetStreamAsync(url, cancellationToken).ConfigureAwait(false))
+            using var stream = await GetHttpClient().GetStreamAsync(url, cancellationToken).ConfigureAwait(false);
+            using var reader = new StreamReader(stream);
+            var xmlResponse = reader.ReadToEnd();
+            UtilsHelper.DebugInformation(_logger, string.Format("[Enigma2] GetRecordingsAsync response: {0}", xmlResponse));
+
+            try
             {
-                using (var reader = new StreamReader(stream))
+                var xml = new XmlDocument();
+                xml.LoadXml(xmlResponse);
+
+                var recordingInfos = new List<MyRecordingInfo>();
+
+                var count = 1;
+
+                var e2movie = xml.GetElementsByTagName("e2movie");
+
+                foreach (XmlNode xmlNode in e2movie)
                 {
-                    var xmlResponse = reader.ReadToEnd();
-                    UtilsHelper.DebugInformation(_logger, string.Format("[Enigma2] GetRecordingsAsync response: {0}", xmlResponse));
+                    var recordingInfo = new MyRecordingInfo();
 
-                    try
+                    var e2servicereference = "?";
+                    var e2title = "?";
+                    var e2description = "?";
+                    var e2servicename = "?";
+                    var e2time = "?";
+                    var e2length = "?";
+                    var e2filename = "?";
+
+                    foreach (XmlNode node in xmlNode.ChildNodes)
                     {
-                        var xml = new XmlDocument();
-                        xml.LoadXml(xmlResponse);
-
-                        var recordingInfos = new List<MyRecordingInfo>();
-
-                        var count = 1;
-
-                        var e2movie = xml.GetElementsByTagName("e2movie");
-
-                        foreach (XmlNode xmlNode in e2movie)
+                        if (node.Name == "e2servicereference")
                         {
-                            var recordingInfo = new MyRecordingInfo();
+                            e2servicereference = node.InnerText;
+                        }
+                        else if (node.Name == "e2title")
+                        {
+                            e2title = node.InnerText;
+                        }
+                        else if (node.Name == "e2description")
+                        {
+                            e2description = node.InnerText;
+                        }
+                        else if (node.Name == "e2servicename")
+                        {
+                            e2servicename = node.InnerText;
+                        }
+                        else if (node.Name == "e2time")
+                        {
+                            e2time = node.InnerText;
+                        }
+                        else if (node.Name == "e2length")
+                        {
+                            e2length = node.InnerText;
+                        }
+                        else if (node.Name == "e2filename")
+                        {
+                            e2filename = node.InnerText;
+                        }
+                    }
 
-                            var e2servicereference = "?";
-                            var e2title = "?";
-                            var e2description = "?";
-                            var e2servicename = "?";
-                            var e2time = "?";
-                            var e2length = "?";
-                            var e2filename = "?";
+                    recordingInfo.Audio = null;
 
-                            foreach (XmlNode node in xmlNode.ChildNodes)
-                            {
-                                if (node.Name == "e2servicereference")
-                                {
-                                    e2servicereference = node.InnerText;
-                                }
-                                else if (node.Name == "e2title")
-                                {
-                                    e2title = node.InnerText;
-                                }
-                                else if (node.Name == "e2description")
-                                {
-                                    e2description = node.InnerText;
-                                }
-                                else if (node.Name == "e2servicename")
-                                {
-                                    e2servicename = node.InnerText;
-                                }
-                                else if (node.Name == "e2time")
-                                {
-                                    e2time = node.InnerText;
-                                }
-                                else if (node.Name == "e2length")
-                                {
-                                    e2length = node.InnerText;
-                                }
-                                else if (node.Name == "e2filename")
-                                {
-                                    e2filename = node.InnerText;
-                                }
-                            }
+                    recordingInfo.ChannelId = null;
+                    //check for radio channel
+                    if (e2servicereference.Contains("RADIO", StringComparison.CurrentCultureIgnoreCase))
+                    {
+                        recordingInfo.ChannelType = ChannelType.Radio;
+                    }
+                    else
+                    {
+                        recordingInfo.ChannelType = ChannelType.TV;
+                    }
 
-                            recordingInfo.Audio = null;
+                    recordingInfo.HasImage = false;
+                    recordingInfo.ImagePath = null;
+                    recordingInfo.ImageUrl = null;
 
-                            recordingInfo.ChannelId = null;
-                            //check for radio channel
-                            if (e2servicereference.ToUpper().Contains("RADIO"))
-                            {
-                                recordingInfo.ChannelType = ChannelType.Radio;
-                            }
-                            else
-                            {
-                                recordingInfo.ChannelType = ChannelType.TV;
-                            }
+                    foreach (var channelInfo in _tvChannelInfos)
+                    {
+                        if (channelInfo.Name == e2servicename)
+                        {
+                            UtilsHelper.DebugInformation(_logger, string.Format("[Enigma2] GetRecordingsAsync match on channel name : {0} for recording {1}", e2servicename, e2title));
+                            recordingInfo.ChannelId = channelInfo.Id;
+                            recordingInfo.ChannelType = channelInfo.ChannelType;
+                            recordingInfo.HasImage = true;
+                            recordingInfo.ImagePath = channelInfo.ImagePath;
+                            recordingInfo.ImageUrl = channelInfo.ImageUrl;
+                            break;
+                        }
+                    }
 
-                            recordingInfo.HasImage = false;
-                            recordingInfo.ImagePath = null;
-                            recordingInfo.ImageUrl = null;
+                    if (recordingInfo.ChannelId == null)
+                    {
+                        UtilsHelper.DebugInformation(_logger, string.Format("[Enigma2] GetRecordingsAsync no match on channel name : {0} for recording {1}", e2servicename, e2title));
+                    }
 
-                            foreach (var channelInfo in tvChannelInfos)
-                            {
-                                if (channelInfo.Name == e2servicename)
-                                {
-                                    UtilsHelper.DebugInformation(_logger, string.Format("[Enigma2] GetRecordingsAsync match on channel name : {0} for recording {1}", e2servicename, e2title));
-                                    recordingInfo.ChannelId = channelInfo.Id;
-                                    recordingInfo.ChannelType = channelInfo.ChannelType;
-                                    recordingInfo.HasImage = true;
-                                    recordingInfo.ImagePath = channelInfo.ImagePath;
-                                    recordingInfo.ImageUrl = channelInfo.ImageUrl;
-                                    break;
-                                }
-                            }
+                    recordingInfo.CommunityRating = 0;
 
-                            if (recordingInfo.ChannelId == null)
-                            {
-                                UtilsHelper.DebugInformation(_logger, string.Format("[Enigma2] GetRecordingsAsync no match on channel name : {0} for recording {1}", e2servicename, e2title));
-                            }
+                    var sdated = long.Parse(e2time);
+                    var sdate = ApiHelper.DateTimeFromUnixTimestampSeconds(sdated);
+                    recordingInfo.StartDate = sdate.ToUniversalTime();
 
-                            recordingInfo.CommunityRating = 0;
+                    //length in format mm:ss
+                    recordingInfo.EndDate = ParseLengthField(sdated, e2length);
 
-                            var sdated = long.Parse(e2time);
-                            var sdate = ApiHelper.DateTimeFromUnixTimestampSeconds(sdated);
-                            recordingInfo.StartDate = sdate.ToUniversalTime();
+                    //recordingInfo.EpisodeTitle = e2title;
+                    recordingInfo.EpisodeTitle = null;
 
-                            //length in format mm:ss
-                            recordingInfo.EndDate = ParseLengthField(sdated, e2length);
+                    recordingInfo.Overview = e2description;
 
-                            //recordingInfo.EpisodeTitle = e2title;
-                            recordingInfo.EpisodeTitle = null;
-
-                            recordingInfo.Overview = e2description;
-
-                            var genre = new List<string>
+                    var genre = new List<string>
                             {
                                 "Unknown"
                             };
-                            recordingInfo.Genres = genre;
+                    recordingInfo.Genres = genre;
 
-                            recordingInfo.Id = e2servicereference;
-                            recordingInfo.IsHD = false;
-                            recordingInfo.IsKids = false;
-                            recordingInfo.IsLive = false;
-                            recordingInfo.IsMovie = false;
-                            recordingInfo.IsNews = false;
-                            recordingInfo.IsPremiere = false;
-                            recordingInfo.IsRepeat = false;
-                            recordingInfo.IsSeries = false;
-                            recordingInfo.IsSports = false;
-                            recordingInfo.Name = e2title;
-                            recordingInfo.OfficialRating = null;
-                            recordingInfo.OriginalAirDate = null;
-                            recordingInfo.Overview = e2description;
-                            recordingInfo.Path = null;
-                            recordingInfo.ProgramId = null;
-                            recordingInfo.SeriesTimerId = null;
-                            recordingInfo.Url = baseUrl + "/file?file=" + WebUtility.UrlEncode(e2filename);
+                    recordingInfo.Id = e2servicereference;
+                    recordingInfo.IsHD = false;
+                    recordingInfo.IsKids = false;
+                    recordingInfo.IsLive = false;
+                    recordingInfo.IsMovie = false;
+                    recordingInfo.IsNews = false;
+                    recordingInfo.IsPremiere = false;
+                    recordingInfo.IsRepeat = false;
+                    recordingInfo.IsSeries = false;
+                    recordingInfo.IsSports = false;
+                    recordingInfo.Name = e2title;
+                    recordingInfo.OfficialRating = null;
+                    recordingInfo.OriginalAirDate = null;
+                    recordingInfo.Overview = e2description;
+                    recordingInfo.Path = null;
+                    recordingInfo.ProgramId = null;
+                    recordingInfo.SeriesTimerId = null;
+                    recordingInfo.Url = baseUrl + "/file?file=" + WebUtility.UrlEncode(e2filename);
 
-                            recordingInfos.Add(recordingInfo);
-                            count = count + 1;
-                        }
-                        return recordingInfos;
-                    }
-                    catch (Exception e)
-                    {
-                        _logger.LogError("[Enigma2] Failed to parse timer information.");
-                        _logger.LogError(string.Format("[Enigma2] GetRecordingsAsync error: {0}", e.Message));
-                        throw new ApplicationException("Failed to parse timer information.");
-                    }
+                    recordingInfos.Add(recordingInfo);
+                    count++;
                 }
+                return recordingInfos;
+            }
+            catch (Exception e)
+            {
+                _logger.LogError("[Enigma2] Failed to parse timer information.");
+                _logger.LogError("[Enigma2] GetRecordingsAsync error: {Message}", e.Message);
+                throw new ApplicationException("Failed to parse timer information.");
             }
         }
 
@@ -742,7 +724,7 @@ namespace Jellyfin.Plugin.Enigma2
         /// <returns></returns>
         public async Task DeleteRecordingAsync(string recordingId, CancellationToken cancellationToken)
         {
-            _logger.LogInformation(string.Format("[Enigma2] Start Delete Recording Async for recordingId: {0}", recordingId));
+            _logger.LogInformation("[Enigma2] Start Delete Recording Async for recordingId: {RecordingId}", recordingId);
             await EnsureConnectionAsync(cancellationToken).ConfigureAwait(false);
 
             var protocol = "http";
@@ -756,53 +738,49 @@ namespace Jellyfin.Plugin.Enigma2
             var url = string.Format("{0}/web/moviedelete?sRef={1}", baseUrl, recordingId);
             UtilsHelper.DebugInformation(_logger, string.Format("[Enigma2] DeleteRecordingAsync url: {0}", url));
 
-            using (var stream = await GetHttpClient().GetStreamAsync(url, cancellationToken).ConfigureAwait(false))
+            using var stream = await GetHttpClient().GetStreamAsync(url, cancellationToken).ConfigureAwait(false);
+            using var reader = new StreamReader(stream);
+            var xmlResponse = reader.ReadToEnd();
+            UtilsHelper.DebugInformation(_logger, string.Format("[Enigma2] DeleteRecordingAsync response: {0}", xmlResponse));
+
+            try
             {
-                using (var reader = new StreamReader(stream))
+                var xml = new XmlDocument();
+                xml.LoadXml(xmlResponse);
+
+                var e2simplexmlresult = xml.GetElementsByTagName("e2simplexmlresult");
+                foreach (XmlNode xmlNode in e2simplexmlresult)
                 {
-                    var xmlResponse = reader.ReadToEnd();
-                    UtilsHelper.DebugInformation(_logger, string.Format("[Enigma2] DeleteRecordingAsync response: {0}", xmlResponse));
+                    var recordingInfo = new MyRecordingInfo();
 
-                    try
+                    var e2state = "?";
+                    var e2statetext = "?";
+
+                    foreach (XmlNode node in xmlNode.ChildNodes)
                     {
-                        var xml = new XmlDocument();
-                        xml.LoadXml(xmlResponse);
-
-                        var e2simplexmlresult = xml.GetElementsByTagName("e2simplexmlresult");
-                        foreach (XmlNode xmlNode in e2simplexmlresult)
+                        if (node.Name == "e2state")
                         {
-                            var recordingInfo = new MyRecordingInfo();
-
-                            var e2state = "?";
-                            var e2statetext = "?";
-
-                            foreach (XmlNode node in xmlNode.ChildNodes)
-                            {
-                                if (node.Name == "e2state")
-                                {
-                                    e2state = node.InnerText;
-                                }
-                                else if (node.Name == "e2statetext")
-                                {
-                                    e2statetext = node.InnerText;
-                                }
-                            }
-
-                            if (e2state != "True")
-                            {
-                                _logger.LogError("[Enigma2] Failed to delete recording information.");
-                                _logger.LogError(string.Format("[Enigma2] DeleteRecordingAsync e2statetext: {0}", e2statetext));
-                                throw new ApplicationException("Failed to delete recording.");
-                            }
+                            e2state = node.InnerText;
+                        }
+                        else if (node.Name == "e2statetext")
+                        {
+                            e2statetext = node.InnerText;
                         }
                     }
-                    catch (Exception e)
+
+                    if (e2state != "True")
                     {
-                        _logger.LogError("[Enigma2] Failed to parse delete recording information.");
-                        _logger.LogError(string.Format("[Enigma2] DeleteRecordingAsync error: {0}", e.Message));
-                        throw new ApplicationException("Failed to parse delete recording information.");
+                        _logger.LogError("[Enigma2] Failed to delete recording information.");
+                        _logger.LogError("[Enigma2] DeleteRecordingAsync e2statetext: {e2statetext}", e2statetext);
+                        throw new ApplicationException("Failed to delete recording.");
                     }
                 }
+            }
+            catch (Exception e)
+            {
+                _logger.LogError("[Enigma2] Failed to parse delete recording information.");
+                _logger.LogError(string.Format("[Enigma2] DeleteRecordingAsync error: {0}", e.Message));
+                throw new ApplicationException("Failed to parse delete recording information.");
             }
         }
 
@@ -815,13 +793,13 @@ namespace Jellyfin.Plugin.Enigma2
         /// <returns></returns>
         public async Task CancelTimerAsync(string timerId, CancellationToken cancellationToken)
         {
-            _logger.LogInformation(string.Format("[Enigma2] Start CancelTimerAsync for recordingId: {0}", timerId));
+            _logger.LogInformation("[Enigma2] Start CancelTimerAsync for recordingId: {TimerId}", timerId);
             await EnsureConnectionAsync(cancellationToken).ConfigureAwait(false);
 
             // extract sRef, id, begin and end from passed timerId
             var words = timerId.Split('~');
             var sRef = words[0];
-            var id = words[1];
+            _ = words[1];
             var begin = words[2];
             var end = words[3];
 
@@ -836,53 +814,49 @@ namespace Jellyfin.Plugin.Enigma2
             var url = string.Format("{0}/web/timerdelete?sRef={1}&begin={2}&end={3}", baseUrl, sRef, begin, end);
             UtilsHelper.DebugInformation(_logger, string.Format("[Enigma2] CancelTimerAsync url: {0}", url));
 
-            using (var stream = await GetHttpClient().GetStreamAsync(url, cancellationToken).ConfigureAwait(false))
+            using var stream = await GetHttpClient().GetStreamAsync(url, cancellationToken).ConfigureAwait(false);
+            using var reader = new StreamReader(stream);
+            var xmlResponse = reader.ReadToEnd();
+            UtilsHelper.DebugInformation(_logger, string.Format("[Enigma2] CancelTimerAsync response: {0}", xmlResponse));
+
+            try
             {
-                using (var reader = new StreamReader(stream))
+                var xml = new XmlDocument();
+                xml.LoadXml(xmlResponse);
+
+                var e2simplexmlresult = xml.GetElementsByTagName("e2simplexmlresult");
+                foreach (XmlNode xmlNode in e2simplexmlresult)
                 {
-                    var xmlResponse = reader.ReadToEnd();
-                    UtilsHelper.DebugInformation(_logger, string.Format("[Enigma2] CancelTimerAsync response: {0}", xmlResponse));
+                    var recordingInfo = new MyRecordingInfo();
 
-                    try
+                    var e2state = "?";
+                    var e2statetext = "?";
+
+                    foreach (XmlNode node in xmlNode.ChildNodes)
                     {
-                        var xml = new XmlDocument();
-                        xml.LoadXml(xmlResponse);
-
-                        var e2simplexmlresult = xml.GetElementsByTagName("e2simplexmlresult");
-                        foreach (XmlNode xmlNode in e2simplexmlresult)
+                        if (node.Name == "e2state")
                         {
-                            var recordingInfo = new MyRecordingInfo();
-
-                            var e2state = "?";
-                            var e2statetext = "?";
-
-                            foreach (XmlNode node in xmlNode.ChildNodes)
-                            {
-                                if (node.Name == "e2state")
-                                {
-                                    e2state = node.InnerText;
-                                }
-                                else if (node.Name == "e2statetext")
-                                {
-                                    e2statetext = node.InnerText;
-                                }
-                            }
-
-                            if (e2state != "True")
-                            {
-                                _logger.LogError("[Enigma2] Failed to cancel timer.");
-                                _logger.LogError(string.Format("[Enigma2] CancelTimerAsync e2statetext: {0}", e2statetext));
-                                throw new ApplicationException("Failed to cancel timer.");
-                            }
+                            e2state = node.InnerText;
+                        }
+                        else if (node.Name == "e2statetext")
+                        {
+                            e2statetext = node.InnerText;
                         }
                     }
-                    catch (Exception e)
+
+                    if (e2state != "True")
                     {
-                        _logger.LogError("[Enigma2] Failed to parse cancel timer information.");
-                        _logger.LogError(string.Format("[Enigma2] CancelTimerAsync error: {0}", e.Message));
-                        throw new ApplicationException("Failed to parse cancel timer information.");
+                        _logger.LogError("[Enigma2] Failed to cancel timer.");
+                        _logger.LogError(string.Format("[Enigma2] CancelTimerAsync e2statetext: {0}", e2statetext));
+                        throw new ApplicationException("Failed to cancel timer.");
                     }
                 }
+            }
+            catch (Exception e)
+            {
+                _logger.LogError("[Enigma2] Failed to parse cancel timer information.");
+                _logger.LogError("[Enigma2] CancelTimerAsync error: {Message}", e.Message);
+                throw new ApplicationException("Failed to parse cancel timer information.");
             }
         }
 
@@ -895,7 +869,7 @@ namespace Jellyfin.Plugin.Enigma2
         /// <returns></returns>
         public async Task CreateTimerAsync(TimerInfo info, CancellationToken cancellationToken)
         {
-            _logger.LogInformation(string.Format("[Enigma2] Start CreateTimerAsync for ChannelId: {0} & Name: {1}", info.ChannelId, info.Name));
+            _logger.LogInformation("[Enigma2] Start CreateTimerAsync for ChannelId: {ChannelId} & Name: {Name}", info.ChannelId, info.Name);
             await EnsureConnectionAsync(cancellationToken).ConfigureAwait(false);
 
             // extract eventid from info.ProgramId
@@ -914,58 +888,54 @@ namespace Jellyfin.Plugin.Enigma2
 
             if (!string.IsNullOrEmpty(Plugin.Instance.Configuration.RecordingPath))
             {
-                url = url + string.Format("&dirname={0}", WebUtility.UrlEncode(Plugin.Instance.Configuration.RecordingPath));
+                url += string.Format("&dirname={0}", WebUtility.UrlEncode(Plugin.Instance.Configuration.RecordingPath));
             }
 
             UtilsHelper.DebugInformation(_logger, string.Format("[Enigma2] CreateTimerAsync url: {0}", url));
 
-            using (var stream = await GetHttpClient().GetStreamAsync(url, cancellationToken).ConfigureAwait(false))
+            using var stream = await GetHttpClient().GetStreamAsync(url, cancellationToken).ConfigureAwait(false);
+            using var reader = new StreamReader(stream);
+            var xmlResponse = reader.ReadToEnd();
+            UtilsHelper.DebugInformation(_logger, string.Format("[Enigma2] CancelTimerAsync response: {0}", xmlResponse));
+
+            try
             {
-                using (var reader = new StreamReader(stream))
+                var xml = new XmlDocument();
+                xml.LoadXml(xmlResponse);
+
+                var e2simplexmlresult = xml.GetElementsByTagName("e2simplexmlresult");
+                foreach (XmlNode xmlNode in e2simplexmlresult)
                 {
-                    var xmlResponse = reader.ReadToEnd();
-                    UtilsHelper.DebugInformation(_logger, string.Format("[Enigma2] CancelTimerAsync response: {0}", xmlResponse));
+                    var recordingInfo = new MyRecordingInfo();
 
-                    try
+                    var e2state = "?";
+                    var e2statetext = "?";
+
+                    foreach (XmlNode node in xmlNode.ChildNodes)
                     {
-                        var xml = new XmlDocument();
-                        xml.LoadXml(xmlResponse);
-
-                        var e2simplexmlresult = xml.GetElementsByTagName("e2simplexmlresult");
-                        foreach (XmlNode xmlNode in e2simplexmlresult)
+                        if (node.Name == "e2state")
                         {
-                            var recordingInfo = new MyRecordingInfo();
-
-                            var e2state = "?";
-                            var e2statetext = "?";
-
-                            foreach (XmlNode node in xmlNode.ChildNodes)
-                            {
-                                if (node.Name == "e2state")
-                                {
-                                    e2state = node.InnerText;
-                                }
-                                else if (node.Name == "e2statetext")
-                                {
-                                    e2statetext = node.InnerText;
-                                }
-                            }
-
-                            if (e2state != "True")
-                            {
-                                _logger.LogError("[Enigma2] Failed to create timer.");
-                                _logger.LogError(string.Format("[Enigma2] CreateTimerAsync e2statetext: {0}", e2statetext));
-                                throw new ApplicationException("Failed to create timer.");
-                            }
+                            e2state = node.InnerText;
+                        }
+                        else if (node.Name == "e2statetext")
+                        {
+                            e2statetext = node.InnerText;
                         }
                     }
-                    catch (Exception e)
+
+                    if (e2state != "True")
                     {
-                        _logger.LogError("[Enigma2] Failed to parse create timer information.");
-                        _logger.LogError(string.Format("[Enigma2] CreateTimerAsync error: {0}", e.Message));
-                        throw new ApplicationException("Failed to parse create timer information.");
+                        _logger.LogError("[Enigma2] Failed to create timer.");
+                        _logger.LogError("[Enigma2] CreateTimerAsync e2statetext: {e2statetext}", e2statetext);
+                        throw new ApplicationException("Failed to create timer.");
                     }
                 }
+            }
+            catch (Exception e)
+            {
+                _logger.LogError("[Enigma2] Failed to parse create timer information.");
+                _logger.LogError("[Enigma2] CreateTimerAsync error: {Message}", e.Message);
+                throw new ApplicationException("Failed to parse create timer information.");
             }
         }
 
@@ -991,120 +961,116 @@ namespace Jellyfin.Plugin.Enigma2
             var url = string.Format("{0}/web/timerlist", baseUrl);
             UtilsHelper.DebugInformation(_logger, string.Format("[Enigma2] GetTimersAsync url: {0}", url));
 
-            using (var stream = await GetHttpClient().GetStreamAsync(url, cancellationToken).ConfigureAwait(false))
+            using var stream = await GetHttpClient().GetStreamAsync(url, cancellationToken).ConfigureAwait(false);
+            using var reader = new StreamReader(stream);
+            var xmlResponse = reader.ReadToEnd();
+            UtilsHelper.DebugInformation(_logger, string.Format("[Enigma2] GetTimersAsync response: {0}", xmlResponse));
+
+            try
             {
-                using (var reader = new StreamReader(stream))
+                var xml = new XmlDocument();
+                xml.LoadXml(xmlResponse);
+
+                var timerInfos = new List<TimerInfo>();
+
+                var count = 1;
+
+                var e2timer = xml.GetElementsByTagName("e2timer");
+                foreach (XmlNode xmlNode in e2timer)
                 {
-                    var xmlResponse = reader.ReadToEnd();
-                    UtilsHelper.DebugInformation(_logger, string.Format("[Enigma2] GetTimersAsync response: {0}", xmlResponse));
+                    var timerInfo = new TimerInfo();
 
-                    try
+                    var e2servicereference = "?";
+                    var e2name = "?";
+                    var e2description = "?";
+                    var e2eit = "?";
+                    var e2timebegin = "?";
+                    var e2timeend = "?";
+                    var e2state = "?";
+
+                    foreach (XmlNode node in xmlNode.ChildNodes)
                     {
-                        var xml = new XmlDocument();
-                        xml.LoadXml(xmlResponse);
-
-                        var timerInfos = new List<TimerInfo>();
-
-                        var count = 1;
-
-                        var e2timer = xml.GetElementsByTagName("e2timer");
-                        foreach (XmlNode xmlNode in e2timer)
+                        if (node.Name == "e2servicereference")
                         {
-                            var timerInfo = new TimerInfo();
-
-                            var e2servicereference = "?";
-                            var e2name = "?";
-                            var e2description = "?";
-                            var e2eit = "?";
-                            var e2timebegin = "?";
-                            var e2timeend = "?";
-                            var e2state = "?";
-
-                            foreach (XmlNode node in xmlNode.ChildNodes)
-                            {
-                                if (node.Name == "e2servicereference")
-                                {
-                                    e2servicereference = node.InnerText;
-                                }
-                                else if (node.Name == "e2name")
-                                {
-                                    e2name = node.InnerText;
-                                }
-                                else if (node.Name == "e2description")
-                                {
-                                    e2description = node.InnerText;
-                                }
-                                else if (node.Name == "e2eit")
-                                {
-                                    e2eit = node.InnerText;
-                                }
-                                else if (node.Name == "e2timebegin")
-                                {
-                                    e2timebegin = node.InnerText;
-                                }
-                                else if (node.Name == "e2timeend")
-                                {
-                                    e2timeend = node.InnerText;
-                                }
-                                else if (node.Name == "e2state")
-                                {
-                                    e2state = node.InnerText;
-                                }
-                            }
-
-                            // only interested in pending timers and ones recording now
-                            if (e2state == "0" || e2state == "2")
-                            {
-
-                                timerInfo.ChannelId = e2servicereference;
-
-                                var edated = long.Parse(e2timeend);
-                                var edate = ApiHelper.DateTimeFromUnixTimestampSeconds(edated);
-                                timerInfo.EndDate = edate.ToUniversalTime();
-
-                                timerInfo.Id = e2servicereference + "~" + e2eit + "~" + e2timebegin + "~" + e2timeend + "~" + count;
-
-                                timerInfo.IsPostPaddingRequired = false;
-                                timerInfo.IsPrePaddingRequired = false;
-                                timerInfo.Name = e2name;
-                                timerInfo.Overview = e2description;
-                                timerInfo.PostPaddingSeconds = 0;
-                                timerInfo.PrePaddingSeconds = 0;
-                                timerInfo.Priority = 0;
-                                timerInfo.ProgramId = null;
-                                timerInfo.SeriesTimerId = null;
-
-                                var sdated = long.Parse(e2timebegin);
-                                var sdate = ApiHelper.DateTimeFromUnixTimestampSeconds(sdated);
-                                timerInfo.StartDate = sdate.ToUniversalTime();
-
-                                if (e2state == "0")
-                                {
-                                    timerInfo.Status = RecordingStatus.New;
-                                }
-
-                                if (e2state == "2")
-                                {
-                                    timerInfo.Status = RecordingStatus.InProgress;
-                                }
-
-                                timerInfos.Add(timerInfo);
-                                count = count + 1;
-                            }
-                            else
-                            {
-                                _logger.LogInformation("[Enigma2] ignoring timer " + e2name);
-                            }
+                            e2servicereference = node.InnerText;
                         }
-                        return timerInfos;
+                        else if (node.Name == "e2name")
+                        {
+                            e2name = node.InnerText;
+                        }
+                        else if (node.Name == "e2description")
+                        {
+                            e2description = node.InnerText;
+                        }
+                        else if (node.Name == "e2eit")
+                        {
+                            e2eit = node.InnerText;
+                        }
+                        else if (node.Name == "e2timebegin")
+                        {
+                            e2timebegin = node.InnerText;
+                        }
+                        else if (node.Name == "e2timeend")
+                        {
+                            e2timeend = node.InnerText;
+                        }
+                        else if (node.Name == "e2state")
+                        {
+                            e2state = node.InnerText;
+                        }
                     }
-                    catch (Exception e)
+
+                    // only interested in pending timers and ones recording now
+                    if (e2state == "0" || e2state == "2")
                     {
-                        _logger.LogError("[Enigma2] Failed to parse timer information.");
-                        _logger.LogError(string.Format("[Enigma2] GetTimersAsync error: {0}", e.Message));
-                        throw new ApplicationException("Failed to parse timer information.");
+
+                        timerInfo.ChannelId = e2servicereference;
+
+                        var edated = long.Parse(e2timeend);
+                        var edate = ApiHelper.DateTimeFromUnixTimestampSeconds(edated);
+                        timerInfo.EndDate = edate.ToUniversalTime();
+
+                        timerInfo.Id = e2servicereference + "~" + e2eit + "~" + e2timebegin + "~" + e2timeend + "~" + count;
+
+                        timerInfo.IsPostPaddingRequired = false;
+                        timerInfo.IsPrePaddingRequired = false;
+                        timerInfo.Name = e2name;
+                        timerInfo.Overview = e2description;
+                        timerInfo.PostPaddingSeconds = 0;
+                        timerInfo.PrePaddingSeconds = 0;
+                        timerInfo.Priority = 0;
+                        timerInfo.ProgramId = null;
+                        timerInfo.SeriesTimerId = null;
+
+                        var sdated = long.Parse(e2timebegin);
+                        var sdate = ApiHelper.DateTimeFromUnixTimestampSeconds(sdated);
+                        timerInfo.StartDate = sdate.ToUniversalTime();
+
+                        if (e2state == "0")
+                        {
+                            timerInfo.Status = RecordingStatus.New;
+                        }
+
+                        if (e2state == "2")
+                        {
+                            timerInfo.Status = RecordingStatus.InProgress;
+                        }
+
+                        timerInfos.Add(timerInfo);
+                        count = count + 1;
+                    }
+                    else
+                    {
+                        _logger.LogInformation("[Enigma2] ignoring timer {e2name}", e2name);
                     }
                 }
+                return timerInfos;
+            }
+            catch (Exception e)
+            {
+                _logger.LogError("[Enigma2] Failed to parse timer information.");
+                _logger.LogError("[Enigma2] GetTimersAsync error: {Message}", e.Message);
+                throw new ApplicationException("Failed to parse timer information.");
             }
         }
 
@@ -1168,10 +1134,9 @@ namespace Jellyfin.Plugin.Enigma2
                 Id = _liveStreams.ToString(CultureInfo.InvariantCulture),
                 Path = streamUrl,
                 Protocol = MediaProtocol.Http,
-                MediaStreams = new List<MediaStream>
-                        {
-                            new MediaStream
-                            {
+                MediaStreams =
+                        [
+                            new() {
                                 Type = MediaStreamType.Video,
                                 // Set the index to -1 because we don't know the exact index of the video stream within the container
                                 Index = -1,
@@ -1180,13 +1145,12 @@ namespace Jellyfin.Plugin.Enigma2
                                 IsInterlaced = true
 
                             },
-                            new MediaStream
-                            {
+                            new() {
                                 Type = MediaStreamType.Audio,
                                 // Set the index to -1 because we don't know the exact index of the audio stream within the container
                                 Index = -1
                             }
-                        }
+                        ]
             };
             throw new ResourceNotFoundException(string.Format("Could not stream channel {0}", channelOid));
         }
@@ -1214,53 +1178,49 @@ namespace Jellyfin.Plugin.Enigma2
             var url = string.Format("{0}/web/zap?sRef={1}", baseUrl, channelOid);
             UtilsHelper.DebugInformation(_logger, string.Format("[Enigma2] ZapToChannel url: {0}", url));
 
-            using (var stream = await GetHttpClient().GetStreamAsync(url, cancellationToken).ConfigureAwait(false))
+            using var stream = await GetHttpClient().GetStreamAsync(url, cancellationToken).ConfigureAwait(false);
+            using var reader = new StreamReader(stream);
+            var xmlResponse = reader.ReadToEnd();
+            UtilsHelper.DebugInformation(_logger, string.Format("[Enigma2] ZapToChannel response: {0}", xmlResponse));
+
+            try
             {
-                using (var reader = new StreamReader(stream))
+                var xml = new XmlDocument();
+                xml.LoadXml(xmlResponse);
+
+                var e2simplexmlresult = xml.GetElementsByTagName("e2simplexmlresult");
+                foreach (XmlNode xmlNode in e2simplexmlresult)
                 {
-                    var xmlResponse = reader.ReadToEnd();
-                    UtilsHelper.DebugInformation(_logger, string.Format("[Enigma2] ZapToChannel response: {0}", xmlResponse));
+                    var recordingInfo = new MyRecordingInfo();
 
-                    try
+                    var e2state = "?";
+                    var e2statetext = "?";
+
+                    foreach (XmlNode node in xmlNode.ChildNodes)
                     {
-                        var xml = new XmlDocument();
-                        xml.LoadXml(xmlResponse);
-
-                        var e2simplexmlresult = xml.GetElementsByTagName("e2simplexmlresult");
-                        foreach (XmlNode xmlNode in e2simplexmlresult)
+                        if (node.Name == "e2state")
                         {
-                            var recordingInfo = new MyRecordingInfo();
-
-                            var e2state = "?";
-                            var e2statetext = "?";
-
-                            foreach (XmlNode node in xmlNode.ChildNodes)
-                            {
-                                if (node.Name == "e2state")
-                                {
-                                    e2state = node.InnerText;
-                                }
-                                else if (node.Name == "e2statetext")
-                                {
-                                    e2statetext = node.InnerText;
-                                }
-                            }
-
-                            if (e2state != "True")
-                            {
-                                _logger.LogError("[Enigma2] Failed to zap to channel.");
-                                _logger.LogError(string.Format("[Enigma2] ZapToChannel e2statetext: {0}", e2statetext));
-                                throw new ApplicationException("Failed to zap to channel.");
-                            }
+                            e2state = node.InnerText;
+                        }
+                        else if (node.Name == "e2statetext")
+                        {
+                            e2statetext = node.InnerText;
                         }
                     }
-                    catch (Exception e)
+
+                    if (e2state != "True")
                     {
-                        _logger.LogError("[Enigma2] Failed to parse create timer information.");
-                        _logger.LogError(string.Format("[Enigma2] ZapToChannel error: {0}", e.Message));
-                        throw new ApplicationException("Failed to parse zap to channel information.");
+                        _logger.LogError("[Enigma2] Failed to zap to channel.");
+                        _logger.LogError("[Enigma2] ZapToChannel e2statetext: {e2statetext}", e2statetext);
+                        throw new ApplicationException("Failed to zap to channel.");
                     }
                 }
+            }
+            catch (Exception e)
+            {
+                _logger.LogError("[Enigma2] Failed to parse create timer information.");
+                _logger.LogError("[Enigma2] ZapToChannel error: {Message}", e.Message);
+                throw new ApplicationException("Failed to parse zap to channel information.");
             }
 
 
@@ -1313,159 +1273,155 @@ namespace Jellyfin.Plugin.Enigma2
             var url = string.Format("{0}/web/epgservice?sRef={1}", baseUrl, channelId);
             UtilsHelper.DebugInformation(_logger, string.Format("[Enigma2] GetProgramsAsync url: {0}", url));
 
-            using (var stream = await GetHttpClient().GetStreamAsync(url, cancellationToken).ConfigureAwait(false))
+            using var stream = await GetHttpClient().GetStreamAsync(url, cancellationToken).ConfigureAwait(false);
+            using var reader = new StreamReader(stream);
+            var xmlResponse = reader.ReadToEnd();
+            UtilsHelper.DebugInformation(_logger, string.Format("[Enigma2] GetProgramsAsync response: {0}", xmlResponse));
+
+            try
             {
-                using (var reader = new StreamReader(stream))
+                var xml = new XmlDocument();
+                xml.LoadXml(xmlResponse);
+
+                var programInfos = new List<ProgramInfo>();
+
+                var count = 1;
+
+                var e2event = xml.GetElementsByTagName("e2event");
+                foreach (XmlNode xmlNode in e2event)
                 {
-                    var xmlResponse = reader.ReadToEnd();
-                    UtilsHelper.DebugInformation(_logger, string.Format("[Enigma2] GetProgramsAsync response: {0}", xmlResponse));
+                    var programInfo = new ProgramInfo();
 
-                    try
+                    var e2eventid = "?";
+                    var e2eventstart = "?";
+                    var e2eventduration = "?";
+                    var e2eventcurrenttime = "?";
+                    var e2eventtitle = "?";
+                    var e2eventdescription = "?";
+                    var e2eventdescriptionextended = "?";
+                    var e2eventservicereference = "?";
+                    var e2eventservicename = "?";
+
+                    foreach (XmlNode node in xmlNode.ChildNodes)
                     {
-                        var xml = new XmlDocument();
-                        xml.LoadXml(xmlResponse);
-
-                        var programInfos = new List<ProgramInfo>();
-
-                        var count = 1;
-
-                        var e2event = xml.GetElementsByTagName("e2event");
-                        foreach (XmlNode xmlNode in e2event)
+                        if (node.Name == "e2eventid")
                         {
-                            var programInfo = new ProgramInfo();
+                            e2eventid = node.InnerText;
+                        }
+                        else if (node.Name == "e2eventstart")
+                        {
+                            e2eventstart = node.InnerText;
+                        }
+                        else if (node.Name == "e2eventduration")
+                        {
+                            e2eventduration = node.InnerText;
+                        }
+                        else if (node.Name == "e2eventcurrenttime")
+                        {
+                            e2eventcurrenttime = node.InnerText;
+                        }
+                        else if (node.Name == "e2eventtitle")
+                        {
+                            e2eventtitle = node.InnerText;
+                        }
+                        else if (node.Name == "e2eventdescription")
+                        {
+                            e2eventdescription = node.InnerText;
+                        }
+                        else if (node.Name == "e2eventdescriptionextended")
+                        {
+                            e2eventdescriptionextended = node.InnerText;
+                        }
+                        else if (node.Name == "e2eventservicereference")
+                        {
+                            e2eventservicereference = node.InnerText;
+                        }
+                        else if (node.Name == "e2eventservicename")
+                        {
+                            e2eventservicename = node.InnerText;
+                        }
+                    }
 
-                            var e2eventid = "?";
-                            var e2eventstart = "?";
-                            var e2eventduration = "?";
-                            var e2eventcurrenttime = "?";
-                            var e2eventtitle = "?";
-                            var e2eventdescription = "?";
-                            var e2eventdescriptionextended = "?";
-                            var e2eventservicereference = "?";
-                            var e2eventservicename = "?";
+                    var sdated = long.Parse(e2eventstart);
+                    var sdate = ApiHelper.DateTimeFromUnixTimestampSeconds(sdated);
 
-                            foreach (XmlNode node in xmlNode.ChildNodes)
+                    // Check whether the current element is within the time range passed
+                    if (sdate > endDateUtc)
+                    {
+                        UtilsHelper.DebugInformation(_logger, string.Format("[Enigma2] GetProgramsAsync epc full ending without adding channel name : {0} program : {1}", e2eventservicename, e2eventtitle));
+                        return programInfos;
+                    }
+                    else
+                    {
+                        UtilsHelper.DebugInformation(_logger, string.Format("[Enigma2] GetProgramsAsync adding program for channel name : {0} program : {1}", e2eventservicename, e2eventtitle));
+                        //programInfo.HasImage = false;
+                        //programInfo.ImagePath = null;
+                        //programInfo.ImageUrl = null;
+                        if (count == 1)
+                        {
+                            foreach (var channelInfo in _tvChannelInfos)
                             {
-                                if (node.Name == "e2eventid")
+                                if (channelInfo.Name == e2eventservicename)
                                 {
-                                    e2eventid = node.InnerText;
-                                }
-                                else if (node.Name == "e2eventstart")
-                                {
-                                    e2eventstart = node.InnerText;
-                                }
-                                else if (node.Name == "e2eventduration")
-                                {
-                                    e2eventduration = node.InnerText;
-                                }
-                                else if (node.Name == "e2eventcurrenttime")
-                                {
-                                    e2eventcurrenttime = node.InnerText;
-                                }
-                                else if (node.Name == "e2eventtitle")
-                                {
-                                    e2eventtitle = node.InnerText;
-                                }
-                                else if (node.Name == "e2eventdescription")
-                                {
-                                    e2eventdescription = node.InnerText;
-                                }
-                                else if (node.Name == "e2eventdescriptionextended")
-                                {
-                                    e2eventdescriptionextended = node.InnerText;
-                                }
-                                else if (node.Name == "e2eventservicereference")
-                                {
-                                    e2eventservicereference = node.InnerText;
-                                }
-                                else if (node.Name == "e2eventservicename")
-                                {
-                                    e2eventservicename = node.InnerText;
+                                    UtilsHelper.DebugInformation(_logger, string.Format("[Enigma2] GetProgramsAsync match on channel name : {0}", e2eventservicename));
+                                    //programInfo.HasImage = true;
+                                    //programInfo.ImagePath = channelInfo.ImagePath;
+                                    //programInfo.ImageUrl = channelInfo.ImageUrl;
+                                    imagePath = channelInfo.ImagePath;
+                                    imageUrl = channelInfo.ImageUrl;
+                                    break;
                                 }
                             }
+                        }
 
-                            var sdated = long.Parse(e2eventstart);
-                            var sdate = ApiHelper.DateTimeFromUnixTimestampSeconds(sdated);
+                        programInfo.HasImage = true;
+                        programInfo.ImagePath = imagePath;
+                        programInfo.ImageUrl = imageUrl;
 
-                            // Check whether the current element is within the time range passed
-                            if (sdate > endDateUtc)
-                            {
-                                UtilsHelper.DebugInformation(_logger, string.Format("[Enigma2] GetProgramsAsync epc full ending without adding channel name : {0} program : {1}", e2eventservicename, e2eventtitle));
-                                return programInfos;
-                            }
-                            else
-                            {
-                                UtilsHelper.DebugInformation(_logger, string.Format("[Enigma2] GetProgramsAsync adding program for channel name : {0} program : {1}", e2eventservicename, e2eventtitle));
-                                //programInfo.HasImage = false;
-                                //programInfo.ImagePath = null;
-                                //programInfo.ImageUrl = null;
-                                if (count == 1)
-                                {
-                                    foreach (var channelInfo in tvChannelInfos)
-                                    {
-                                        if (channelInfo.Name == e2eventservicename)
-                                        {
-                                            UtilsHelper.DebugInformation(_logger, string.Format("[Enigma2] GetProgramsAsync match on channel name : {0}", e2eventservicename));
-                                            //programInfo.HasImage = true;
-                                            //programInfo.ImagePath = channelInfo.ImagePath;
-                                            //programInfo.ImageUrl = channelInfo.ImageUrl;
-                                            imagePath = channelInfo.ImagePath;
-                                            imageUrl = channelInfo.ImageUrl;
-                                            break;
-                                        }
-                                    }
-                                }
+                        programInfo.ChannelId = e2eventservicereference;
 
-                                programInfo.HasImage = true;
-                                programInfo.ImagePath = imagePath;
-                                programInfo.ImageUrl = imageUrl;
+                        // for some reason the Id appears to have to be unique so will make it so
+                        programInfo.Id = e2eventservicereference + "~" + e2eventid + "~" + count + "~" + rnd.Next();
 
-                                programInfo.ChannelId = e2eventservicereference;
+                        programInfo.Overview = e2eventdescriptionextended;
 
-                                // for some reason the Id appears to have to be unique so will make it so
-                                programInfo.Id = e2eventservicereference + "~" + e2eventid + "~" + count + "~" + rnd.Next();
+                        var edated = long.Parse(e2eventstart) + long.Parse(e2eventduration);
+                        var edate = ApiHelper.DateTimeFromUnixTimestampSeconds(edated);
 
-                                programInfo.Overview = e2eventdescriptionextended;
+                        programInfo.StartDate = sdate.ToUniversalTime();
+                        programInfo.EndDate = edate.ToUniversalTime();
 
-                                var edated = long.Parse(e2eventstart) + long.Parse(e2eventduration);
-                                var edate = ApiHelper.DateTimeFromUnixTimestampSeconds(edated);
-
-                                programInfo.StartDate = sdate.ToUniversalTime();
-                                programInfo.EndDate = edate.ToUniversalTime();
-
-                                var genre = new List<string>
+                        var genre = new List<string>
                                 {
                                     "Unknown"
                                 };
-                                programInfo.Genres = genre;
+                        programInfo.Genres = genre;
 
-                                //programInfo.OriginalAirDate = null;
-                                programInfo.Name = e2eventtitle;
-                                //programInfo.OfficialRating = null;
-                                //programInfo.CommunityRating = null;
-                                //programInfo.EpisodeTitle = null;
-                                //programInfo.Audio = null;
-                                //programInfo.IsHD = false;
-                                //programInfo.IsRepeat = false;
-                                //programInfo.IsSeries = false;
-                                //programInfo.IsNews = false;
-                                //programInfo.IsMovie = false;
-                                //programInfo.IsKids = false;
-                                //programInfo.IsSports = false;
+                        //programInfo.OriginalAirDate = null;
+                        programInfo.Name = e2eventtitle;
+                        //programInfo.OfficialRating = null;
+                        //programInfo.CommunityRating = null;
+                        //programInfo.EpisodeTitle = null;
+                        //programInfo.Audio = null;
+                        //programInfo.IsHD = false;
+                        //programInfo.IsRepeat = false;
+                        //programInfo.IsSeries = false;
+                        //programInfo.IsNews = false;
+                        //programInfo.IsMovie = false;
+                        //programInfo.IsKids = false;
+                        //programInfo.IsSports = false;
 
-                                programInfos.Add(programInfo);
-                                count = count + 1;
-                            }
-                        }
-                        return programInfos;
-                    }
-                    catch (Exception e)
-                    {
-                        _logger.LogError("[Enigma2] Failed to parse program information.");
-                        _logger.LogError(string.Format("[Enigma2] GetProgramsAsync error: {0}", e.Message));
-                        throw new ApplicationException("Failed to parse channel information.");
+                        programInfos.Add(programInfo);
+                        count++;
                     }
                 }
+                return programInfos;
+            }
+            catch (Exception e)
+            {
+                _logger.LogError("[Enigma2] Failed to parse program information.");
+                _logger.LogError(string.Format("[Enigma2] GetProgramsAsync error: {0}", e.Message));
+                throw new ApplicationException("Failed to parse channel information.");
             }
         }
 
@@ -1573,7 +1529,7 @@ namespace Jellyfin.Plugin.Enigma2
 
         public async Task<MediaSourceInfo> GetRecordingStream(string recordingId, string mediaSourceId, CancellationToken cancellationToken)
         {
-            await Task.Delay(0); //to avoid await warnings
+            await Task.Delay(0, cancellationToken); //to avoid await warnings
             throw new NotImplementedException();
         }
 
@@ -1615,7 +1571,7 @@ namespace Jellyfin.Plugin.Enigma2
         public async Task<IEnumerable<SeriesTimerInfo>> GetSeriesTimersAsync(CancellationToken cancellationToken)
         {
             _logger.LogInformation("[Enigma2] Start GetSeriesTimersAsync");
-            await Task.Delay(0); //to avoid await warnings
+            await Task.Delay(0, cancellationToken); //to avoid await warnings
             var seriesTimerInfo = new List<SeriesTimerInfo>();
             return seriesTimerInfo;
         }
@@ -1629,7 +1585,7 @@ namespace Jellyfin.Plugin.Enigma2
         /// <returns></returns>
         public async Task CreateSeriesTimerAsync(SeriesTimerInfo info, CancellationToken cancellationToken)
         {
-            await Task.Delay(0); //to avoid await warnings
+            await Task.Delay(0, cancellationToken); //to avoid await warnings
             throw new NotImplementedException();
         }
 
@@ -1642,7 +1598,7 @@ namespace Jellyfin.Plugin.Enigma2
         /// <returns></returns>
         public async Task UpdateSeriesTimerAsync(SeriesTimerInfo info, CancellationToken cancellationToken)
         {
-            await Task.Delay(0); //to avoid await warnings
+            await Task.Delay(0, cancellationToken); //to avoid await warnings
             throw new NotImplementedException();
         }
 
@@ -1655,7 +1611,7 @@ namespace Jellyfin.Plugin.Enigma2
         /// <returns></returns>
         public async Task UpdateTimerAsync(TimerInfo info, CancellationToken cancellationToken)
         {
-            await Task.Delay(0); //to avoid await warnings
+            await Task.Delay(0, cancellationToken); //to avoid await warnings
             throw new NotImplementedException();
         }
 
@@ -1668,7 +1624,7 @@ namespace Jellyfin.Plugin.Enigma2
         /// <returns></returns>
         public async Task CancelSeriesTimerAsync(string timerId, CancellationToken cancellationToken)
         {
-            await Task.Delay(0); //to avoid await warnings
+            await Task.Delay(0, cancellationToken); //to avoid await warnings
             throw new NotImplementedException();
         }
 
@@ -1708,10 +1664,8 @@ namespace Jellyfin.Plugin.Enigma2
             if (words.Length != 2)
                 return DateTime.MinValue;
 
-            long mins = 0;
-            _ = long.TryParse(words[0], out mins);
-            long seconds = 0;
-            _ = long.TryParse(words[1], out seconds);
+            _ = long.TryParse(words[0], out var mins);
+            _ = long.TryParse(words[1], out var seconds);
             var edated = startTime + (mins * 60) + seconds;
             var edate = ApiHelper.DateTimeFromUnixTimestampSeconds(edated);
             return edate.ToUniversalTime();
