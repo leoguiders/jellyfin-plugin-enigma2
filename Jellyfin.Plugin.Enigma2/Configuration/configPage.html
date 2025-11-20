@@ -142,6 +142,16 @@
                             The Transcoding port of your receiver eg. 8002
                         </div>
                     </div>
+                    <div class="checkboxContainer checkboxContainer-withDescription">
+                        <label>
+                            <input is="emby-checkbox" type="checkbox" id="chkTranscodingUseDefaultParameters" />
+                            <span>Use default transcoding parameters</span>
+                        </label>
+                        <div class="fieldDescription checkboxFieldDescription">
+                            Use default parameters for transcoding requests (omit request parameters for bitrate etc.)
+                        </div>
+                    </div>
+
 
                     <label class="checkboxContainer">
                         <input is="emby-checkbox" type="checkbox" id="chkDebugLogging" />
@@ -181,6 +191,7 @@
                         document.getElementById('txtRecordingPath').value = config.RecordingPath || "";
                         document.getElementById('chkTranscodedStream').checked = config.TranscodedStream || false;
                         document.getElementById('txtTranscodingPort').value = config.TranscodingPort || "";
+                        document.getElementById('chkTranscodingUseDefaultParameters').checked = config.TranscodingUseDefaultParameters || true;
                         document.getElementById('chkDebugLogging').checked = config.EnableDebugLogging || false;
 
                         Dashboard.hideLoadingMsg();
@@ -207,6 +218,7 @@
                         config.RecordingPath = document.getElementById('txtRecordingPath').value;
                         config.TranscodedStream = document.getElementById('chkTranscodedStream').checked;
                         config.TranscodingPort = document.getElementById('txtTranscodingPort').value;
+                        config.TranscodingUseDefaultParameters = document.getElementById('chkTranscodingUseDefaultParameters').checked;
                         config.EnableDebugLogging = document.getElementById('chkDebugLogging').checked;
 
                         ApiClient.updatePluginConfiguration(Enigma2ConfigurationPage.pluginUniqueId, config).then(Dashboard.processPluginConfigurationUpdateResult);

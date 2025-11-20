@@ -1154,7 +1154,7 @@ namespace Jellyfin.Plugin.Enigma2
             }
 
             var trancodingUrl = "";
-            if (Plugin.Instance.Configuration.TranscodedStream)
+            if (Plugin.Instance.Configuration.TranscodedStream && !Plugin.Instance.Configuration.TranscodingUseDefaultParameters)
             {
                 trancodingUrl = "?bitrate=1000000?width=1280?height=720?vcodec=h264?aspectratio=2?interlaced=0.mp4";
             }
