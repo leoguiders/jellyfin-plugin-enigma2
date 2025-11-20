@@ -24,7 +24,7 @@ namespace Jellyfin.Plugin.Enigma2.Configuration
         public string RecordingPath { get; set; }
 
         public bool TranscodedStream { get; set; }
-        public bool TranscodingUseDefaultParameters { get; private set; }
+        public bool TranscodingUseDefaultParameters { get; set; }
         public string TranscodingPort { get; set; }
 
         public bool EnableDebugLogging { get; set; }
